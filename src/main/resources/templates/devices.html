@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" 
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout :: page('Devices Inventory', ~{::content})}">
+<body>
+
+    <div th:fragment="content">
+        <!-- Header -->
+        <div class="top-header">
+            <div class="header-title">
+                <h1>Infrastructure Device Inventory</h1>
+                <p>Enterprise asset inventory tracking and criticality classifications.</p>
+            </div>
+            
+            <div class="header-actions" sec:authorize="hasAuthority('MANAGE_DEVICES')">
+                <button type="button" class="btn btn-soc-primary" data-bs-toggle="modal" data-bs-target="#deviceModal" onclick="prepareAddForm()">
+                    <i class="fa-solid fa-plus me-2"></i>Register Device
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Bar Card -->
+        <div class="soc-card py-3.5 mb-4">
+            <form th:action="@{/devices}" method="get" class="row g-3 align-items-center">
+                <div class="col-md-9 col-sm-8">
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="text" class="form-control bg-dark border-secondary text-white" 
+                               name="search" th:value="${searchQuery}" 
+                               placeholder="Search devices by name, IP address, OS, etc...">
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-soc-primary w-100">SEARCH</button>
+                    <a th:href="@{/devices}" class="btn btn-soc-secondary"><i class="fa-solid fa-rotate-left"></i></a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Inventory List Card -->
+        <div class="soc-card">
+            <div class="soc-table-container">
+                <table class="soc-table">
+                    <thead>
+                        <tr>
+                            <th>Device Name</th>
+                            <th>Device Type</th>
+                            <th>IP Address</th>
+                            <th>MAC Address</th>
+                            <th>Operating System</th>
+                            <th>Owner</th>
+                            <th>Criticality</th>
+                            <th>Status</th>
+                            <th sec:authorize="hasAuthority('MANAGE_DEVICES')" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="device : ${devices}">
+                            <td class="fw-bold text-white">
+                                <span th:text="${device.name}">Device Name</span>
+                                <div class="text-muted fw-normal" style="font-size:0.75rem;">
+                                    <i class="fa-solid fa-location-dot me-1"></i><span th:text="${device.location} ?: 'N/A'">Location</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-dark border border-secondary text-muted text-uppercase" th:text="${device.deviceType}">SERVER</span>
+                            </td>
+                            <td style="font-family: 'JetBrains Mono', monospace;" th:text="${device.ipAddress}">192.168.1.1</td>
+                            <td style="font-family: 'JetBrains Mono', monospace;" th:text="${device.macAddress}">00:00:00:00:00:00</td>
+                            <td th:text="${device.operatingSystem} ?: 'Unknown OS'">OS</td>
+                            <td th:text="${device.owner} ?: 'N/A'">Owner</td>
+                            <td>
+                                <span class="badge-soc" 
+                                      th:classappend="${#strings.toLowerCase(device.criticality)}" 
+                                      th:text="${device.criticality}">CRITICAL</span>
+                            </td>
+                            <td>
+                                <span class="badge-soc"
+                                      th:classappend="${#strings.toLowerCase(device.status)}"
+                                      th:text="${device.status}">ONLINE</span>
+                            </td>
+                            <td sec:authorize="hasAuthority('MANAGE_DEVICES')" class="text-end">
+                                <button class="btn btn-sm btn-outline-info me-1" 
+                                        th:onclick="'loadDeviceForEdit(' + ${device.id} + ')'" 
+                                        title="Edit Device">
+                                    <i class="fa-regular fa-pen-to-square"></i>
+                                </button>
+                                <a th:href="@{/devices/delete/{id}(id=${device.id})}" 
+                                   class="btn btn-sm btn-outline-danger" 
+                                   onclick="return confirm('Are you sure you want to remove this device from inventory?')" 
+                                   title="Remove Device">
+                                    <i class="fa-regular fa-trash-can"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(devices)}">
+                            <td colspan="9" class="text-center text-muted py-5">
+                                <i class="fa-solid fa-circle-question fa-2x mb-3 text-secondary"></i>
+                                <p class="m-0">No network devices registered. Click 'Register Device' to add assets.</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Add/Edit Device Modal (Bootstrap 5) -->
+        <div class="modal fade" id="deviceModal" tabindex="-1" aria-labelledby="deviceModalLabel" aria-hidden="true" style="background-color: rgba(0, 0, 0, 0.6);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark border-secondary text-white">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title" id="deviceModalLabel">Register Network Asset</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    
+                    <form th:action="@{/devices/save}" method="post" th:object="${newDevice}">
+                        <div class="modal-body">
+                            <!-- Hidden ID input for update checks -->
+                            <input type="hidden" id="edit-id" th:field="*{id}">
+                            
+                            <div class="mb-3">
+                                <label for="name" class="form-label" style="font-size:0.85rem;">DEVICE NAME</label>
+                                <input type="text" class="form-control bg-dark border-secondary text-white" id="edit-name" th:field="*{name}" placeholder="e.g. Core-Switch-02" required>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="ipAddress" class="form-label" style="font-size:0.85rem;">IP ADDRESS (IPv4)</label>
+                                    <input type="text" class="form-control bg-dark border-secondary text-white" id="edit-ipAddress" th:field="*{ipAddress}" placeholder="e.g. 192.168.1.15" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="macAddress" class="form-label" style="font-size:0.85rem;">MAC ADDRESS</label>
+                                    <input type="text" class="form-control bg-dark border-secondary text-white" id="edit-macAddress" th:field="*{macAddress}" placeholder="e.g. 00:0C:29:A1:B2:C3" required>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="deviceType" class="form-label" style="font-size:0.85rem;">DEVICE TYPE</label>
+                                    <select class="form-select bg-dark border-secondary text-white" id="edit-deviceType" th:field="*{deviceType}" required>
+                                        <option value="ROUTER">Router</option>
+                                        <option value="FIREWALL">Firewall</option>
+                                        <option value="SERVER">Server</option>
+                                        <option value="WORKSTATION">Workstation</option>
+                                        <option value="SWITCH">Switch</option>
+                                        <option value="ACCESS_POINT">Access Point</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="criticality" class="form-label" style="font-size:0.85rem;">CRITICALITY LEVEL</label>
+                                    <select class="form-select bg-dark border-secondary text-white" id="edit-criticality" th:field="*{criticality}" required>
+                                        <option value="CRITICAL">Critical</option>
+                                        <option value="HIGH">High</option>
+                                        <option value="MEDIUM">Medium</option>
+                                        <option value="LOW">Low</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="operatingSystem" class="form-label" style="font-size:0.85rem;">OPERATING SYSTEM</label>
+                                <input type="text" class="form-control bg-dark border-secondary text-white" id="edit-operatingSystem" th:field="*{operatingSystem}" placeholder="e.g. Cisco IOS / Windows Server 2022 / RHEL 9">
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="location" class="form-label" style="font-size:0.85rem;">PHYSICAL LOCATION</label>
+                                    <input type="text" class="form-control bg-dark border-secondary text-white" id="edit-location" th:field="*{location}" placeholder="e.g. Server Room Rack B">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="owner" class="form-label" style="font-size:0.85rem;">OWNER/DEPARTMENT</label>
+                                    <input type="text" class="form-control bg-dark border-secondary text-white" id="edit-owner" th:field="*{owner}" placeholder="e.g. Systems Operations">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-soc-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-soc-primary">SAVE ASSET</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Edit modal popup filler JS -->
+    <th:block th:fragment="extraScripts">
+        <script>
+            function prepareAddForm() {
+                document.getElementById('deviceModalLabel').innerText = "Register Network Asset";
+                document.getElementById('edit-id').value = "";
+                document.getElementById('edit-name').value = "";
+                document.getElementById('edit-ipAddress').value = "";
+                document.getElementById('edit-macAddress').value = "";
+                document.getElementById('edit-deviceType').value = "SERVER";
+                document.getElementById('edit-criticality').value = "MEDIUM";
+                document.getElementById('edit-operatingSystem').value = "";
+                document.getElementById('edit-location').value = "";
+                document.getElementById('edit-owner').value = "";
+            }
+
+            function loadDeviceForEdit(id) {
+                // Fetch device info via REST call
+                fetch('/devices/edit/' + id)
+                    .then(response => response.json())
+                    .then(device => {
+                        document.getElementById('deviceModalLabel').innerText = "Edit Network Asset";
+                        document.getElementById('edit-id').value = device.id;
+                        document.getElementById('edit-name').value = device.name;
+                        document.getElementById('edit-ipAddress').value = device.ipAddress;
+                        document.getElementById('edit-macAddress').value = device.macAddress;
+                        document.getElementById('edit-deviceType').value = device.deviceType;
+                        document.getElementById('edit-criticality').value = device.criticality;
+                        document.getElementById('edit-operatingSystem').value = device.operatingSystem || "";
+                        document.getElementById('edit-location').value = device.location || "";
+                        document.getElementById('edit-owner').value = device.owner || "";
+                        
+                        // Open the modal programmatically
+                        let myModal = new bootstrap.Modal(document.getElementById('deviceModal'));
+                        myModal.show();
+                    })
+                    .catch(err => {
+                        alert('Error loading device details: ' + err.message);
+                    });
+            }
+        </script>
+    </th:block>
+
+</body>
+</html>

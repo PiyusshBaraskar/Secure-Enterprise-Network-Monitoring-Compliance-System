@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" 
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout :: page('Dashboard', ~{::content})}">
+<head>
+    <!-- Page specific extra headers -->
+    <th:block th:fragment="extraHeaders">
+        <!-- Chart.js 3.9 CDN -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    </th:block>
+</head>
+<body>
+
+    <div th:fragment="content">
+        <!-- Top header metadata -->
+        <div class="top-header">
+            <div class="header-title">
+                <h1>Security Operations Center (SOC)</h1>
+                <p>Real-time network security health and compliance telemetry.</p>
+            </div>
+            <div class="header-actions">
+                <span class="badge bg-secondary p-2.5 rounded-3 fw-semibold">
+                    <i class="fa-regular fa-clock me-2"></i>Live Monitoring
+                </span>
+            </div>
+        </div>
+
+        <!-- Hidden container supplying chart values to dashboard.js -->
+        <div id="charts-data" th:style="'display:none;'"
+             th:attr="data-online=${onlineDevices},
+                      data-offline=${offlineDevices},
+                      data-critical=${criticalAlerts},
+                      data-high=${highAlerts},
+                      data-medium=${mediumAlerts},
+                      data-low=${lowAlerts}">
+        </div>
+
+        <!-- KPI Grid -->
+        <div class="kpi-container">
+            <div class="soc-card kpi-card blue glow-blue">
+                <div class="kpi-details">
+                    <span class="text-muted">Total Devices</span>
+                    <h3 th:text="${totalDevices}">0</h3>
+                </div>
+                <div class="kpi-icon"><i class="fa-solid fa-server"></i></div>
+            </div>
+            
+            <div class="soc-card kpi-card green glow-green">
+                <div class="kpi-details">
+                    <span class="text-muted">Online Nodes</span>
+                    <h3 th:text="${onlineDevices}">0</h3>
+                </div>
+                <div class="kpi-icon"><i class="fa-solid fa-circle-check"></i></div>
+            </div>
+            
+            <div class="soc-card kpi-card yellow glow-yellow">
+                <div class="kpi-details">
+                    <span class="text-muted">Compliance Score</span>
+                    <h3 th:text="${complianceScore} + '%'">0%</h3>
+                </div>
+                <div class="kpi-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+            </div>
+            
+            <div class="soc-card kpi-card red glow-red">
+                <div class="kpi-details">
+                    <span class="text-muted">Critical Incidents</span>
+                    <h3 th:text="${criticalAlertsCount}">0</h3>
+                </div>
+                <div class="kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            </div>
+        </div>
+
+        <!-- Charts Layout Row -->
+        <div class="row">
+            <div class="col-lg-4 col-md-12">
+                <div class="soc-card" style="height: 350px;">
+                    <h5 class="text-white mb-4"><i class="fa-solid fa-chart-pie me-2 text-muted"></i>Device Allocation</h5>
+                    <div style="position: relative; height: 230px;">
+                        <canvas id="deviceStatusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-8 col-md-12">
+                <div class="soc-card" style="height: 350px;">
+                    <h5 class="text-white mb-4"><i class="fa-solid fa-chart-bar me-2 text-muted"></i>Incidents by Severity</h5>
+                    <div style="position: relative; height: 230px;">
+                        <canvas id="alertSeverityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Logs & Alerts Row -->
+        <div class="row mt-2">
+            <!-- Security Alerts List -->
+            <div class="col-xl-6 col-lg-12">
+                <div class="soc-card h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="text-white m-0"><i class="fa-solid fa-shield-halved me-2 text-muted"></i>Recent Security Alerts</h5>
+                        <a th:href="@{/alerts}" class="btn btn-sm btn-outline-secondary py-1 text-uppercase" style="font-size:0.75rem;">View All</a>
+                    </div>
+                    <div class="soc-table-container">
+                        <table class="soc-table">
+                            <thead>
+                                <tr>
+                                    <th>Incident</th>
+                                    <th>Target IP</th>
+                                    <th>Severity</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="alert : ${recentAlerts}">
+                                    <td>
+                                        <div class="fw-semibold text-white" th:text="${alert.alertType}">PORT_SCAN</div>
+                                        <small class="text-muted" style="font-size: 0.75rem;" th:text="${#dates.format(alert.timestamp, 'HH:mm:ss')}">Time</small>
+                                    </td>
+                                    <td th:text="${alert.destinationIp} ?: 'N/A'">IP</td>
+                                    <td>
+                                        <span class="badge-soc text-uppercase" 
+                                              th:classappend="${#strings.toLowerCase(alert.severity)}" 
+                                              th:text="${alert.severity}">Severity</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary rounded-pill py-1" 
+                                              style="font-size: 0.75rem; text-transform: uppercase;" 
+                                              th:text="${alert.status}">NEW</span>
+                                    </td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(recentAlerts)}">
+                                    <td colspan="4" class="text-center text-muted py-4">No security incidents detected. System is clean.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Logs list -->
+            <div class="col-xl-6 col-lg-12">
+                <div class="soc-card h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="text-white m-0"><i class="fa-solid fa-terminal me-2 text-muted"></i>Recent Telemetry Logs</h5>
+                        <a th:href="@{/logs}" class="btn btn-sm btn-outline-secondary py-1 text-uppercase" style="font-size:0.75rem;">Audit Logs</a>
+                    </div>
+                    <div class="soc-table-container">
+                        <table class="soc-table">
+                            <thead>
+                                <tr>
+                                    <th>Source</th>
+                                    <th>Host IP</th>
+                                    <th>Level</th>
+                                    <th>Message</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="log : ${recentLogs}">
+                                    <td>
+                                        <span class="badge bg-dark border border-secondary text-muted" th:text="${log.logSource}">LINUX</span>
+                                    </td>
+                                    <td th:text="${log.ipAddress} ?: 'N/A'">IP</td>
+                                    <td>
+                                        <span class="fw-bold" 
+                                              th:style="'color: ' + (${log.logLevel == 'ERROR' ? '#ff1744' : (log.logLevel == 'WARN' ? '#ffea00' : '#00b0ff')})" 
+                                              th:text="${log.logLevel}">INFO</span>
+                                    </td>
+                                    <td>
+                                        <div class="text-truncate" style="max-width: 240px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;"
+                                             th:text="${log.message}" th:title="${log.message}">
+                                            Log Message
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(recentLogs)}">
+                                    <td colspan="4" class="text-center text-muted py-4">No system log telemetry parsed yet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Extra page scripts -->
+    <th:block th:fragment="extraScripts">
+        <script th:src="@{/js/dashboard.js}"></script>
+    </th:block>
+
+</body>
+</html>

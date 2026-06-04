@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" 
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout :: page('Network Discovery Scans', ~{::content})}">
+<body>
+
+    <div th:fragment="content">
+        <!-- Header -->
+        <div class="top-header">
+            <div class="header-title">
+                <h1>Network Discovery Scanner</h1>
+                <p>Run network sweeps and service audits using integrated discovery tools.</p>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Scan Controls & Terminal -->
+            <div class="col-xl-7 col-lg-12">
+                <!-- Control Panel Card -->
+                <div class="soc-card mb-4">
+                    <h5 class="text-white mb-4"><i class="fa-solid fa-radar me-2 text-muted"></i>Active Scan Control</h5>
+                    
+                    <form id="scanForm" class="row g-3 align-items-center">
+                        <div class="col-sm-8 col-12">
+                            <label for="targetRange" class="form-label" style="font-size:0.8rem; text-transform:uppercase;">Scan Target Range (IP or CIDR)</label>
+                            <input type="text" class="form-control bg-dark border-secondary text-white" 
+                                   id="targetRange" name="targetRange" 
+                                   placeholder="e.g. 192.168.1.0/24" value="192.168.1.0/24" required
+                                   sec:authorize="hasAuthority('RUN_SCANS')">
+                            <!-- Readonly display for visitors who cannot run scans -->
+                            <input type="text" class="form-control bg-dark border-secondary text-muted" 
+                                   id="targetRange" th:value="'192.168.1.0/24'" readonly
+                                   sec:authorize="!hasAuthority('RUN_SCANS')">
+                        </div>
+                        <div class="col-sm-4 col-12 mt-4 pt-2">
+                            <button type="submit" id="btnStartScan" class="btn btn-soc-primary w-100" sec:authorize="hasAuthority('RUN_SCANS')">
+                                <i class="fa-solid fa-play me-2"></i>START SCAN
+                            </button>
+                            <button type="button" class="btn btn-soc-secondary w-100 text-muted" sec:authorize="!hasAuthority('RUN_SCANS')" disabled>
+                                <i class="fa-solid fa-lock me-2"></i>READ ONLY
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Scanning Progress Bar -->
+                    <div id="scanProgressContainer" class="mt-4 d-none">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-white fw-semibold" style="font-size: 0.8rem;">
+                                <span class="scanning-loader me-2"><div></div><div></div><div></div></span>Scanning Subnet...
+                            </span>
+                            <span id="scanProgressText" class="text-white fw-bold" style="font-size: 0.8rem;">0%</span>
+                        </div>
+                        <div class="progress bg-dark" style="height: 6px;">
+                            <div id="scanProgressBar" class="progress-bar bg-info progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Terminal logs screen -->
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <div class="terminal-controls">
+                            <div class="terminal-dot red"></div>
+                            <div class="terminal-dot yellow"></div>
+                            <div class="terminal-dot green"></div>
+                        </div>
+                        <div class="terminal-title">discovery-shell (nmap simulator)</div>
+                        <i class="fa-solid fa-terminal text-muted" style="font-size: 0.85rem;"></i>
+                    </div>
+                    <div class="terminal-body" id="terminalConsole">
+                        # Enter target range and click 'START SCAN' to trigger active host discovery.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Discovery Scan results history -->
+            <div class="col-xl-5 col-lg-12">
+                <div class="soc-card h-100">
+                    <h5 class="text-white mb-4"><i class="fa-solid fa-clipboard-list me-2 text-muted"></i>Discovered Live Hosts</h5>
+                    <div class="soc-table-container" style="max-height: 480px; overflow-y: auto;">
+                        <table class="soc-table">
+                            <thead>
+                                <tr>
+                                    <th>Host IP</th>
+                                    <th>Operating System</th>
+                                    <th>Ports / Services</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scanResultsBody">
+                                <tr th:each="scan : ${scanResults}">
+                                    <td>
+                                        <div class="fw-bold text-white" th:text="${scan.ipAddress}">IP</div>
+                                        <small class="text-muted" style="font-size:0.75rem;" th:text="${scan.hostname}">Hostname</small>
+                                    </td>
+                                    <td th:text="${scan.operatingSystem} ?: 'Unknown'">OS</td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <span class="badge bg-dark border border-secondary text-white-50" 
+                                                  style="font-size:0.7rem; font-family:'JetBrains Mono', monospace;"
+                                                  th:each="port : ${#strings.arraySplit(scan.ports, ',')}" 
+                                                  th:text="${port}">80</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(scanResults)}">
+                                    <td colspan="3" class="text-center text-muted py-5" id="noScansRow">No discovered host entries saved in database. Run a scan.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scanning JavaScript -->
+    <th:block th:fragment="extraScripts">
+        <script>
+            let pollInterval = null;
+            const consoleEl = document.getElementById('terminalConsole');
+            const progressContainer = document.getElementById('scanProgressContainer');
+            const progressBar = document.getElementById('scanProgressBar');
+            const progressText = document.getElementById('scanProgressText');
+            const btnScan = document.getElementById('btnStartScan');
+
+            document.getElementById('scanForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const range = document.getElementById('targetRange').value;
+
+                // Lock button and show progress bar
+                if (btnScan) {
+                    btnScan.disabled = true;
+                    btnScan.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>RUNNING...`;
+                }
+                progressContainer.classList.remove('d-none');
+                progressBar.style.width = '0%';
+                progressText.innerText = '0%';
+                consoleEl.innerHTML = "[*] Dispatching scan request...";
+
+                // POST request to run scan
+                let formData = new FormData();
+                formData.append('targetRange', range);
+
+                fetch('/scans/run', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Start polling
+                        pollInterval = setInterval(pollScanStatus, 1000);
+                    } else {
+                        resetScanButton();
+                        consoleEl.innerHTML = `<span class="text-danger">[!] Error starting scan: ${data.message}</span>`;
+                    }
+                })
+                .catch(err => {
+                    resetScanButton();
+                    consoleEl.innerHTML = `<span class="text-danger">[!] Network Error: ${err.message}</span>`;
+                });
+            });
+
+            function pollScanStatus() {
+                fetch('/scans/status')
+                .then(response => response.json())
+                .then(status => {
+                    // Update progress
+                    const progressVal = status.progress;
+                    progressBar.style.width = progressVal + '%';
+                    progressText.innerText = progressVal + '%';
+
+                    // Update console logs
+                    if (status.logs && status.logs.length > 0) {
+                        consoleEl.innerHTML = status.logs.join('\n');
+                        // Auto scroll console to bottom
+                        consoleEl.scrollTop = consoleEl.scrollHeight;
+                    }
+
+                    if (!status.isScanning) {
+                        // Scan completed!
+                        clearInterval(pollInterval);
+                        resetScanButton();
+                        progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+                        progressBar.classList.add('bg-success');
+                        progressText.innerHTML = `<i class="fa-solid fa-circle-check text-success me-1"></i>Finished`;
+                        
+                        // Reload scan results table and redirect/refresh
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    }
+                })
+                .catch(err => {
+                    clearInterval(pollInterval);
+                    resetScanButton();
+                    console.append("\n[!] Connection lost to scan manager API.");
+                });
+            }
+
+            function resetScanButton() {
+                if (btnScan) {
+                    btnScan.disabled = false;
+                    btnScan.innerHTML = `<i class="fa-solid fa-play me-2"></i>START SCAN`;
+                }
+            }
+        </script>
+    </th:block>
+
+</body>
+</html>

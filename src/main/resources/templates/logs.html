@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" 
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout :: page('Telemetry Log Audit', ~{::content})}">
+<body>
+
+    <div th:fragment="content">
+        <!-- Header -->
+        <div class="top-header">
+            <div class="header-title">
+                <h1>Log Auditing & Management</h1>
+                <p>Search, filter, and export log telemetry collected from enterprise servers and firewalls.</p>
+            </div>
+            
+            <div class="header-actions" sec:authorize="hasAuthority('VIEW_LOGS')">
+                <!-- Dynamic export URL incorporating active filter params -->
+                <a th:href="@{/logs/export(source=${selectedSource}, level=${selectedLevel}, ipAddress=${selectedIp}, message=${selectedMessage})}" 
+                   class="btn btn-soc-secondary">
+                    <i class="fa-solid fa-file-export me-2"></i>Export CSV
+                </a>
+            </div>
+        </div>
+
+        <!-- Filter Controls Card -->
+        <div class="soc-card mb-4">
+            <h5 class="text-white mb-3"><i class="fa-solid fa-filter me-2 text-muted"></i>Filter Telemetry</h5>
+            <form th:action="@{/logs}" method="get" class="row g-3">
+                <div class="col-md-3 col-sm-6">
+                    <label for="source" class="form-label text-muted" style="font-size:0.8rem;">LOG SOURCE</label>
+                    <select class="form-select bg-dark border-secondary text-white" id="source" name="source">
+                        <option value="">All Sources</option>
+                        <option value="WINDOWS" th:selected="${selectedSource == 'WINDOWS'}">Windows Event Log</option>
+                        <option value="LINUX" th:selected="${selectedSource == 'LINUX'}">Linux Syslog</option>
+                        <option value="FIREWALL" th:selected="${selectedSource == 'FIREWALL'}">pfSense Firewall</option>
+                        <option value="APPLICATION" th:selected="${selectedSource == 'APPLICATION'}">Application Monitor</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-2 col-sm-6">
+                    <label for="level" class="form-label text-muted" style="font-size:0.8rem;">LOG LEVEL</label>
+                    <select class="form-select bg-dark border-secondary text-white" id="level" name="level">
+                        <option value="">All Levels</option>
+                        <option value="INFO" th:selected="${selectedLevel == 'INFO'}">INFO</option>
+                        <option value="WARN" th:selected="${selectedLevel == 'WARN'}">WARN</option>
+                        <option value="ERROR" th:selected="${selectedLevel == 'ERROR'}">ERROR</option>
+                        <option value="DEBUG" th:selected="${selectedLevel == 'DEBUG'}">DEBUG</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3 col-sm-6">
+                    <label for="ipAddress" class="form-label text-muted" style="font-size:0.8rem;">HOST IP ADDRESS</label>
+                    <input type="text" class="form-control bg-dark border-secondary text-white" 
+                           id="ipAddress" name="ipAddress" th:value="${selectedIp}" placeholder="e.g. 192.168.1.20">
+                </div>
+                
+                <div class="col-md-4 col-sm-6">
+                    <label for="message" class="form-label text-muted" style="font-size:0.8rem;">KEYWORD SEARCH</label>
+                    <input type="text" class="form-control bg-dark border-secondary text-white" 
+                           id="message" name="message" th:value="${selectedMessage}" placeholder="e.g. login, connection, blocked">
+                </div>
+                
+                <div class="col-12 d-flex justify-content-end gap-2 mt-3">
+                    <a th:href="@{/logs}" class="btn btn-soc-secondary">RESET</a>
+                    <button type="submit" class="btn btn-soc-primary">APPLY FILTER</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Logs Table Card -->
+        <div class="soc-card">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="text-white m-0"><i class="fa-solid fa-list me-2 text-muted"></i>Ingested System Log Console</h5>
+                <span class="text-muted" style="font-size:0.8rem;">Total: <strong class="text-white" th:text="${totalLogs}">0</strong> entries</span>
+            </div>
+            
+            <div class="soc-table-container">
+                <table class="soc-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 180px;">Log Timestamp</th>
+                            <th style="width: 140px;">Source</th>
+                            <th style="width: 140px;">Host IP</th>
+                            <th style="width: 100px;">Level</th>
+                            <th>Log Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="log : ${logPage.content}">
+                            <td style="font-size:0.8rem; color:var(--color-text-muted);" 
+                                th:text="${#dates.format(log.timestamp, 'yyyy-MM-dd HH:mm:ss')}">Timestamp</td>
+                            <td>
+                                <span class="badge bg-dark border border-secondary text-muted text-uppercase" th:text="${log.logSource}">LINUX</span>
+                            </td>
+                            <td style="font-family: 'JetBrains Mono', monospace;" th:text="${log.ipAddress} ?: 'N/A'">IP</td>
+                            <td>
+                                <span class="fw-bold" 
+                                      th:style="'color: ' + (${log.logLevel == 'ERROR' ? '#ff1744' : (log.logLevel == 'WARN' ? '#ffea00' : '#00b0ff')})" 
+                                      th:text="${log.logLevel}">INFO</span>
+                            </td>
+                            <td>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; word-break: break-all;" th:text="${log.message}">
+                                    Log Message details
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(logPage.content)}">
+                            <td colspan="5" class="text-center text-muted py-5">
+                                <i class="fa-solid fa-circle-nodes fa-2x mb-3 text-secondary"></i>
+                                <p class="m-0">No system logs match the current filter criteria.</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Control Bar -->
+            <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top border-secondary" th:if="${totalPages > 0}">
+                <div class="text-muted" style="font-size:0.8rem;">
+                    Page <span th:text="${currentPage + 1}">1</span> of <span th:text="${totalPages}">1</span>
+                </div>
+                
+                <nav aria-label="Log pagination">
+                    <ul class="pagination pagination-sm m-0 gap-1">
+                        <li class="page-item" th:classappend="${currentPage == 0} ? 'disabled'">
+                            <a class="page-link bg-dark border-secondary text-white py-1.5 px-3" 
+                               th:href="@{/logs(source=${selectedSource}, level=${selectedLevel}, ipAddress=${selectedIp}, message=${selectedMessage}, page=${currentPage - 1})}">
+                                <i class="fa-solid fa-chevron-left me-1"></i>Previous
+                            </a>
+                        </li>
+                        <li class="page-item" th:classappend="${currentPage == totalPages - 1} ? 'disabled'">
+                            <a class="page-link bg-dark border-secondary text-white py-1.5 px-3" 
+                               th:href="@{/logs(source=${selectedSource}, level=${selectedLevel}, ipAddress=${selectedIp}, message=${selectedMessage}, page=${currentPage + 1})}">
+                                Next<i class="fa-solid fa-chevron-right ms-1"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

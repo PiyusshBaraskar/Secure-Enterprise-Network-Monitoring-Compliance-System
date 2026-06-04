@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" 
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout :: page('Compliance Audits', ~{::content})}">
+<body>
+
+    <div th:fragment="content">
+        <!-- Header -->
+        <div class="top-header">
+            <div class="header-title">
+                <h1>Compliance Auditing & Standards</h1>
+                <p>Verify internal server and switch configuration states against ISO 27001, CIS Benchmarks, and Basic Controls.</p>
+            </div>
+            
+            <div class="header-actions" sec:authorize="hasAuthority('RUN_AUDITS')">
+                <form th:action="@{/compliance/run}" method="post">
+                    <button type="submit" class="btn btn-soc-primary">
+                        <i class="fa-solid fa-arrows-spin me-2"></i>Run Security Audit
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Left Side: Compliance Score & Standards List -->
+            <div class="col-lg-4 col-md-12 mb-4">
+                <div class="soc-card text-center glow-blue">
+                    <h5 class="text-white mb-4">Compliance Status</h5>
+                    
+                    <!-- Compliance Score Display -->
+                    <div class="d-inline-flex justify-content-center align-items-center rounded-circle border border-5 border-info mb-4" 
+                         style="width: 140px; height: 140px; background-color: rgba(0, 176, 255, 0.05); box-shadow: 0 0 20px var(--accent-blue-glow);">
+                        <div>
+                            <h2 class="text-white fw-bold m-0" th:text="${complianceScore} + '%'">100%</h2>
+                            <small class="text-muted" style="font-size:0.75rem;">SCORE</small>
+                        </div>
+                    </div>
+
+                    <p class="text-muted" style="font-size:0.9rem;">
+                        This score is weighted on the total successful pass checks out of fail and warning entries found across the domain.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Right Side: Standard Audit Results Lists -->
+            <div class="col-lg-8 col-md-12">
+                <!-- ISO 27001 -->
+                <div class="soc-card mb-4">
+                    <h5 class="text-white mb-3"><i class="fa-solid fa-circle-nodes me-2 text-muted"></i>ISO 27001 Control Scope</h5>
+                    <div class="soc-table-container">
+                        <table class="soc-table">
+                            <thead>
+                                <tr>
+                                    <th>Audit Check Name</th>
+                                    <th>Category</th>
+                                    <th>Status</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="res : ${isoResults}">
+                                    <td class="fw-bold text-white" th:text="${res.checkName}">Check Title</td>
+                                    <td th:text="${res.checkCategory}">Category</td>
+                                    <td>
+                                        <span class="badge-soc" 
+                                              th:classappend="${#strings.toLowerCase(res.status)}" 
+                                              th:text="${res.status}">PASS</span>
+                                    </td>
+                                    <td style="font-size:0.85rem;" th:text="${res.details}">Details</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- CIS Benchmark -->
+                <div class="soc-card mb-4">
+                    <h5 class="text-white mb-3"><i class="fa-solid fa-shield-halved me-2 text-muted"></i>CIS Benchmarks</h5>
+                    <div class="soc-table-container">
+                        <table class="soc-table">
+                            <thead>
+                                <tr>
+                                    <th>Audit Check Name</th>
+                                    <th>Category</th>
+                                    <th>Status</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="res : ${cisResults}">
+                                    <td class="fw-bold text-white" th:text="${res.checkName}">Check Title</td>
+                                    <td th:text="${res.checkCategory}">Category</td>
+                                    <td>
+                                        <span class="badge-soc" 
+                                              th:classappend="${#strings.toLowerCase(res.status)}" 
+                                              th:text="${res.status}">PASS</span>
+                                    </td>
+                                    <td style="font-size:0.85rem;" th:text="${res.details}">Details</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Basic Security Controls -->
+                <div class="soc-card">
+                    <h5 class="text-white mb-3"><i class="fa-solid fa-list-check me-2 text-muted"></i>Basic Security Controls (BSC)</h5>
+                    <div class="soc-table-container">
+                        <table class="soc-table">
+                            <thead>
+                                <tr>
+                                    <th>Audit Check Name</th>
+                                    <th>Category</th>
+                                    <th>Status</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="res : ${bscResults}">
+                                    <td class="fw-bold text-white" th:text="${res.checkName}">Check Title</td>
+                                    <td th:text="${res.checkCategory}">Category</td>
+                                    <td>
+                                        <span class="badge-soc" 
+                                              th:classappend="${#strings.toLowerCase(res.status)}" 
+                                              th:text="${res.status}">PASS</span>
+                                    </td>
+                                    <td style="font-size:0.85rem;" th:text="${res.details}">Details</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

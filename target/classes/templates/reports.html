@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" 
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout :: page('Audit Reports', ~{::content})}">
+<body>
+
+    <div th:fragment="content">
+        <!-- Header -->
+        <div class="top-header">
+            <div class="header-title">
+                <h1>Executive Security Reports</h1>
+                <p>Compile and download daily, weekly, or monthly security snapshots in PDF and CSV formats.</p>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Left Side: Generate Report Panel -->
+            <div class="col-lg-4 col-md-12 mb-4" sec:authorize="hasAuthority('GENERATE_REPORTS')">
+                <div class="soc-card">
+                    <h5 class="text-white mb-4"><i class="fa-solid fa-file-circle-plus me-2 text-muted"></i>Compile Report</h5>
+                    
+                    <form th:action="@{/reports/generate}" method="post">
+                        <div class="mb-3">
+                            <label for="reportType" class="form-label text-muted" style="font-size:0.8rem;">REPORT PERIOD</label>
+                            <select class="form-select bg-dark border-secondary text-white" id="reportType" name="reportType" required>
+                                <option value="DAILY">Daily Status Report</option>
+                                <option value="WEEKLY">Weekly Compliance Audit</option>
+                                <option value="MONTHLY">Monthly Strategic Report</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="format" class="form-label text-muted" style="font-size:0.8rem;">EXPORT FORMAT</label>
+                            <select class="form-select bg-dark border-secondary text-white" id="format" name="format" required>
+                                <option value="PDF">PDF (Structured Document)</option>
+                                <option value="CSV">CSV (Spreadsheet Data)</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-soc-primary w-100 py-2.5">
+                            <i class="fa-solid fa-gears me-2"></i>COMPILE & SAVE
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Read Only block for non-auditors -->
+            <div class="col-lg-4 col-md-12 mb-4" sec:authorize="!hasAuthority('GENERATE_REPORTS')">
+                <div class="soc-card text-center text-muted">
+                    <i class="fa-solid fa-lock fa-3x mb-3 text-secondary"></i>
+                    <h5>Compile Restructured</h5>
+                    <p class="m-0" style="font-size:0.85rem;">Only users with 'ROLE_AUDITOR' or 'ROLE_ADMIN' permissions are authorized to compile new reports.</p>
+                </div>
+            </div>
+
+            <!-- Right Side: Report History List -->
+            <div class="col-lg-8 col-md-12">
+                <div class="soc-card">
+                    <h5 class="text-white mb-4"><i class="fa-solid fa-clock-rotate-left me-2 text-muted"></i>Audit Report History</h5>
+                    
+                    <div class="soc-table-container">
+                        <table class="soc-table">
+                            <thead>
+                                <tr>
+                                    <th>Report Title</th>
+                                    <th>Compiled On</th>
+                                    <th>Score</th>
+                                    <th>Issues</th>
+                                    <th>Format</th>
+                                    <th class="text-end">Download</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="report : ${reports}">
+                                    <td class="fw-bold text-white">
+                                        <span th:text="${report.name}">Report Name</span>
+                                        <div class="text-muted fw-normal" style="font-size:0.75rem;">
+                                            Compiled by: <span th:text="${report.createdBy}">Auditor</span>
+                                        </div>
+                                    </td>
+                                    <td style="font-size:0.8rem; color:var(--color-text-muted);" 
+                                        th:text="${#dates.format(report.createdAt, 'yyyy-MM-dd HH:mm')}">Date</td>
+                                    <td>
+                                        <span class="fw-bold" 
+                                              th:style="'color: ' + (${report.complianceScore >= 80.0 ? '#00e676' : '#ffea00'})" 
+                                              th:text="${report.complianceScore} + '%'">100%</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-danger rounded-pill" 
+                                              th:if="${report.criticalVulnerabilities > 0}" 
+                                              th:text="${report.criticalVulnerabilities}">0</span>
+                                        <span class="text-success" th:if="${report.criticalVulnerabilities == 0}"><i class="fa-solid fa-circle-check"></i></span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-dark border border-secondary text-muted text-uppercase" 
+                                              th:text="${report.format}">PDF</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a th:href="@{/reports/download/{id}(id=${report.id})}" 
+                                           class="btn btn-sm btn-outline-info" 
+                                           title="Download file">
+                                            <i class="fa-solid fa-download"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(reports)}">
+                                    <td colspan="6" class="text-center text-muted py-5">
+                                        <i class="fa-regular fa-folder-open fa-2x mb-3 text-secondary"></i>
+                                        <p class="m-0">No compiled audit reports in database. Trigger one from the side panel.</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

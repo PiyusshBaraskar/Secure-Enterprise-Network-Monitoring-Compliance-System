@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # MySQL Database Service
+  mysql-db:
+    image: mysql:8.0
+    container_name: soc-mysql-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: security_monitor_db
+      MYSQL_ROOT_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - soc-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p" + "password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Spring Boot Application Service
+  security-monitor-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: soc-monitor-app
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: mysql
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/security_monitor_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: password
+      APP_REPORTS_DIR: /app/reports
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    volumes:
+      - app-reports:/app/reports
+    networks:
+      - soc-network
+
+volumes:
+  db-data:
+  app-reports:
+
+networks:
+  soc-network:
+    driver: bridge

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" 
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout :: page('Security Alerts Console', ~{::content})}">
+<body>
+
+    <div th:fragment="content">
+        <!-- Header -->
+        <div class="top-header">
+            <div class="header-title">
+                <h1>Security Event & Incident Console</h1>
+                <p>SOC Alert ingestion queue and active thread investigation workspace.</p>
+            </div>
+        </div>
+
+        <!-- Severity Stats Row -->
+        <div class="row g-3 mb-4 text-center">
+            <div class="col-6 col-md-3">
+                <div class="soc-card py-3 mb-0" style="border-left: 4px solid var(--accent-red);">
+                    <span class="text-uppercase text-muted fw-bold" style="font-size:0.75rem;">Critical</span>
+                    <h4 class="text-white mt-2 mb-0" th:text="${criticalCount}">0</h4>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="soc-card py-3 mb-0" style="border-left: 4px solid #ff9100;">
+                    <span class="text-uppercase text-muted fw-bold" style="font-size:0.75rem;">High</span>
+                    <h4 class="text-white mt-2 mb-0" th:text="${highCount}">0</h4>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="soc-card py-3 mb-0" style="border-left: 4px solid #2979ff;">
+                    <span class="text-uppercase text-muted fw-bold" style="font-size:0.75rem;">Medium</span>
+                    <h4 class="text-white mt-2 mb-0" th:text="${mediumCount}">0</h4>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="soc-card py-3 mb-0" style="border-left: 4px solid #00e5ff;">
+                    <span class="text-uppercase text-muted fw-bold" style="font-size:0.75rem;">Low</span>
+                    <h4 class="text-white mt-2 mb-0" th:text="${lowCount}">0</h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts Queue Card -->
+        <div class="soc-card">
+            <h5 class="text-white mb-4"><i class="fa-solid fa-list-check me-2 text-muted"></i>Active Incident Ingestion Queue</h5>
+            
+            <div class="soc-table-container">
+                <table class="soc-table">
+                    <thead>
+                        <tr>
+                            <th>Incident Time</th>
+                            <th>Alert Category</th>
+                            <th>Description</th>
+                            <th>Source IP</th>
+                            <th>Dest IP</th>
+                            <th>Severity</th>
+                            <th>Status</th>
+                            <th>Handler</th>
+                            <th sec:authorize="hasAuthority('VIEW_ALERTS')" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="alert : ${alerts}" th:style="${alert.status == 'RESOLVED' or alert.status == 'DISMISSED' ? 'opacity: 0.55;' : ''}">
+                            <td style="font-size:0.8rem; color: var(--color-text-muted);" 
+                                th:text="${#dates.format(alert.timestamp, 'yyyy-MM-dd HH:mm:ss')}">Timestamp</td>
+                            <td class="fw-bold text-white" th:text="${alert.alertType}">PORT_SCAN</td>
+                            <td>
+                                <div style="max-width: 320px; font-size: 0.85rem;" th:text="${alert.description}">Description details</div>
+                            </td>
+                            <td style="font-family: 'JetBrains Mono', monospace;" th:text="${alert.sourceIp} ?: 'N/A'">Source IP</td>
+                            <td style="font-family: 'JetBrains Mono', monospace;" th:text="${alert.destinationIp} ?: 'N/A'">Dest IP</td>
+                            <td>
+                                <span class="badge-soc text-uppercase" 
+                                      th:classappend="${#strings.toLowerCase(alert.severity)}" 
+                                      th:text="${alert.severity}">Severity</span>
+                            </td>
+                            <td>
+                                <span class="badge" 
+                                      th:classappend="${alert.status == 'NEW' ? 'bg-danger' : (alert.status == 'INVESTIGATING' ? 'bg-warning text-dark' : 'bg-success')}"
+                                      style="font-size:0.7rem; text-transform:uppercase;"
+                                      th:text="${alert.status}">NEW</span>
+                            </td>
+                            <td class="fw-bold" th:style="${alert.assignedTo == null ? 'color: var(--color-text-muted); font-weight:normal;' : 'color: var(--accent-blue);'}"
+                                th:text="${alert.assignedTo} ?: 'Unassigned'">Handler</td>
+                            
+                            <td sec:authorize="hasAuthority('VIEW_ALERTS')" class="text-end">
+                                <div class="btn-group" role="group" th:if="${alert.status != 'RESOLVED' and alert.status != 'DISMISSED'}">
+                                    <!-- Assign Action -->
+                                    <a th:href="@{/alerts/assign/{id}(id=${alert.id})}" 
+                                       class="btn btn-sm btn-outline-info" 
+                                       th:if="${alert.assignedTo == null}"
+                                       title="Assign to Me">
+                                        <i class="fa-solid fa-user-check"></i>
+                                    </a>
+                                    <!-- Resolve Action -->
+                                    <a th:href="@{/alerts/resolve/{id}(id=${alert.id})}" 
+                                       class="btn btn-sm btn-outline-success" 
+                                       title="Resolve Alert">
+                                        <i class="fa-solid fa-check"></i>
+                                    </a>
+                                    <!-- Dismiss Action -->
+                                    <a th:href="@{/alerts/dismiss/{id}(id=${alert.id})}" 
+                                       class="btn btn-sm btn-outline-secondary" 
+                                       title="Dismiss Alert">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </a>
+                                </div>
+                                <span th:if="${alert.status == 'RESOLVED' or alert.status == 'DISMISSED'}" class="text-muted" style="font-size:0.75rem;">
+                                    <i class="fa-solid fa-lock me-1"></i>Closed
+                                </span>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(alerts)}">
+                            <td colspan="9" class="text-center text-muted py-5">
+                                <i class="fa-solid fa-shield-halved fa-2x mb-3 text-success"></i>
+                                <p class="m-0">Excellent. No security incident alerts ingested in database queue.</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
